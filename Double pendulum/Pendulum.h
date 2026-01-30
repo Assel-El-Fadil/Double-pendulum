@@ -59,32 +59,71 @@ public:
         };
     }
 
-    void updateMotion(float dt)
+    void updateMotionRK4(float dt)
     {
-		if (g_pause) return;
-        l1 = g_l1;
-        l2 = g_l2;
-        m1 = g_m1;
-        m2 = g_m2;
+        if (g_pause) return;
 
-        float num1 = -g_gravity * (2 * m1 + m2) * sin(theta1);
-        float num2 = -m2 * g_gravity * sin(theta1 - 2 * theta2);
-        float num3 = -2 * sin(theta1 - theta2) * m2;
-        float num4 = omega2 * omega2 * l2 + omega1 * omega1 * l1 * cos(theta1 - theta2);
-        float den = l1 * (2 * m1 + m2 - m2 * cos(2 * theta1 - 2 * theta2));
-        accel1 = (num1 + num2 + num3 * num4) / den;
+        l1 = g_l1; l2 = g_l2;
+        m1 = g_m1; m2 = g_m2;
 
-        num1 = 2 * sin(theta1 - theta2);
-        num2 = omega1 * omega1 * l1 * (m1 + m2);
-        num3 = g_gravity * (m1 + m2) * cos(theta1);
-        num4 = omega2 * omega2 * l2 * m2 * cos(theta1 - theta2);
-        den = l2 * (2 * m1 + m2 - m2 * cos(2 * theta1 - 2 * theta2));
-        accel2 = (num1 * (num2 + num3 + num4)) / den;
+        // helper lambda to compute accelerations
+        auto accel = [&](float th1, float th2, float w1, float w2, float& a1, float& a2) {
+            float num1 = -g_gravity * (2 * m1 + m2) * sin(th1);
+            float num2 = -m2 * g_gravity * sin(th1 - 2 * th2);
+            float num3 = -2 * sin(th1 - th2) * m2;
+            float num4 = w2 * w2 * l2 + w1 * w1 * l1 * cos(th1 - th2);
+            float den = l1 * (2 * m1 + m2 - m2 * cos(2 * th1 - 2 * th2));
+            a1 = (num1 + num2 + num3 * num4) / den;
 
-        omega1 += accel1 * dt;
-        omega2 += accel2 * dt;
-        theta1 += omega1 * dt;
-        theta2 += omega2 * dt;
+            num1 = 2 * sin(th1 - th2);
+            num2 = w1 * w1 * l1 * (m1 + m2);
+            num3 = g_gravity * (m1 + m2) * cos(th1);
+            num4 = w2 * w2 * l2 * m2 * cos(th1 - th2);
+            den = l2 * (2 * m1 + m2 - m2 * cos(2 * th1 - 2 * th2));
+            a2 = (num1 * (num2 + num3 + num4)) / den;
+            };
+
+        // store original state
+        float th1 = theta1, th2 = theta2;
+        float w1 = omega1, w2 = omega2;
+        float a1, a2;
+
+        // --- k1 ---
+        accel(th1, th2, w1, w2, a1, a2);
+        float k1_th1 = w1;
+        float k1_th2 = w2;
+        float k1_w1 = a1;
+        float k1_w2 = a2;
+
+        // --- k2 ---
+        accel(th1 + 0.5f * k1_th1 * dt, th2 + 0.5f * k1_th2 * dt,
+            w1 + 0.5f * k1_w1 * dt, w2 + 0.5f * k1_w2 * dt, a1, a2);
+        float k2_th1 = w1 + 0.5f * k1_w1 * dt;
+        float k2_th2 = w2 + 0.5f * k1_w2 * dt;
+        float k2_w1 = a1;
+        float k2_w2 = a2;
+
+        // --- k3 ---
+        accel(th1 + 0.5f * k2_th1 * dt, th2 + 0.5f * k2_th2 * dt,
+            w1 + 0.5f * k2_w1 * dt, w2 + 0.5f * k2_w2 * dt, a1, a2);
+        float k3_th1 = w1 + 0.5f * k2_w1 * dt;
+        float k3_th2 = w2 + 0.5f * k2_w2 * dt;
+        float k3_w1 = a1;
+        float k3_w2 = a2;
+
+        // --- k4 ---
+        accel(th1 + k3_th1 * dt, th2 + k3_th2 * dt,
+            w1 + k3_w1 * dt, w2 + k3_w2 * dt, a1, a2);
+        float k4_th1 = w1 + k3_w1 * dt;
+        float k4_th2 = w2 + k3_w2 * dt;
+        float k4_w1 = a1;
+        float k4_w2 = a2;
+
+        // --- combine ---
+        theta1 += dt / 6.0f * (k1_th1 + 2 * k2_th1 + 2 * k3_th1 + k4_th1);
+        theta2 += dt / 6.0f * (k1_th2 + 2 * k2_th2 + 2 * k3_th2 + k4_th2);
+        omega1 += dt / 6.0f * (k1_w1 + 2 * k2_w1 + 2 * k3_w1 + k4_w1);
+        omega2 += dt / 6.0f * (k1_w2 + 2 * k2_w2 + 2 * k3_w2 + k4_w2);
     }
 
     void updateTrail(float x, float y)

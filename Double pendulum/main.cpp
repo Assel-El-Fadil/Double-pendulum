@@ -11,6 +11,7 @@ const int HEIGHT = 600;
 const float PI = 3.14159265358979323846f;
 
 bool g_pause = false;
+bool g_reverse = false;
 bool g_showPendulums = false;
 bool g_showTrails = true;
 
@@ -24,7 +25,7 @@ float g_m1 = 30.0f;
 float g_m2 = 10.0f;
 float g_gravity = -9.81f;
 
-int g_count = 100;
+int g_count = 250;
 
 std::vector<Pendulum> pendulums;
 
@@ -77,6 +78,7 @@ int main()
 
         ImGui::Begin("Simulation Controls");
 		ImGui::Checkbox("Pause", &g_pause);
+		ImGui::Checkbox("Reverse", &g_reverse);
         ImGui::Checkbox("Show Pendulums", &g_showPendulums);
         ImGui::Checkbox("Show Trails", &g_showTrails);
 
@@ -110,7 +112,9 @@ int main()
         // --- Simulation ---
         for (auto& p : pendulums)
         {
-            p.updateMotion(0.1f);
+			float dt = g_reverse ? -0.01f : 0.01f;
+			for (int i = 0; i < 5; i++)
+                p.updateMotionRK4(dt);
             float cx = WIDTH / 2.0f;
             float cy = HEIGHT / 2.0f;
             float x = cx + g_l1 * sin(p.theta1) + g_l2 * sin(p.theta2);
